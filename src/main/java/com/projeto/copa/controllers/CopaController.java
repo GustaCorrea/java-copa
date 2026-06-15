@@ -18,9 +18,27 @@ public class CopaController {
         this.copaService = copaService;
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<CopaResponse> buscarPorId(@PathVariable Long id) {
+        CopaResponse response = copaService.findById(id);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     public ResponseEntity<CopaResponse> iniciarCopa(@Valid @RequestBody IniciarCopaRequest request) {
         CopaResponse response = copaService.iniciarCopa(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletarCopa(@PathVariable Long id) {
+        copaService.deleteCopa(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/trocar-time/{timeId}")
+    public ResponseEntity<CopaResponse> trocarTime(@PathVariable Long id, @PathVariable Long timeId) {
+        CopaResponse response = copaService.trocarTime(id, timeId);
         return ResponseEntity.ok(response);
     }
 }

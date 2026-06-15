@@ -81,4 +81,29 @@ public class CopaService {
         // 8. Traduzir o resultado final para o Angular
         return CopaMapper.toResponse(copaSalva);
     }
+
+    public CopaResponse findById(Long id) {
+        Copa copa = copaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Copa não encontrada com o ID: " + id));
+        return CopaMapper.toResponse(copa);
+    }
+
+    // Método delete
+    public void deleteCopa(Long id) {
+        copaRepository.deleteById(id);
+    }
+
+    // Método put(trocar time)
+    public CopaResponse trocarTime(Long copaId, Long novoTimeId) {
+        Copa copa = copaRepository.findById(copaId)
+                .orElseThrow(() -> new RuntimeException("Copa não encontrada!"));
+
+        Time novoTime = timeRepository.findById(novoTimeId)
+                .orElseThrow(() -> new RuntimeException("Time não encontrado!"));
+
+        copa.setTimeDoJogador(novoTime);
+        Copa copaAtualizada = copaRepository.save(copa);
+
+        return CopaMapper.toResponse(copaAtualizada);
+    }
 }
