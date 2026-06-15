@@ -2,30 +2,39 @@ package com.projeto.copa.services;
 
 import com.projeto.copa.dtos.CopaResponse;
 import com.projeto.copa.dtos.IniciarCopaRequest;
+import com.projeto.copa.dtos.PartidaResponse;
+import com.projeto.copa.dtos.SalvarPlacarRequest;
 import com.projeto.copa.entities.Copa;
 import com.projeto.copa.entities.Partida;
 import com.projeto.copa.entities.Time;
 import com.projeto.copa.enums.FaseCopa;
 import com.projeto.copa.enums.StatusCopa;
 import com.projeto.copa.mappers.CopaMapper;
+import com.projeto.copa.mappers.PartidaMapper;
 import com.projeto.copa.repositories.CopaRepository;
+import com.projeto.copa.repositories.PartidaRepository;
 import com.projeto.copa.repositories.TimeRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 @Service
 public class CopaService {
 
     private final CopaRepository copaRepository;
     private final TimeRepository timeRepository;
+    private final PartidaRepository partidaRepository;
 
     // Injeção de dependências pelo construtor
-    public CopaService(CopaRepository copaRepository, TimeRepository timeRepository) {
+    public CopaService(CopaRepository copaRepository,
+            TimeRepository timeRepository,
+            PartidaRepository partidaRepository) {
         this.copaRepository = copaRepository;
         this.timeRepository = timeRepository;
+        this.partidaRepository = partidaRepository;
     }
 
     public CopaResponse iniciarCopa(IniciarCopaRequest request) {
@@ -105,5 +114,108 @@ public class CopaService {
         Copa copaAtualizada = copaRepository.save(copa);
 
         return CopaMapper.toResponse(copaAtualizada);
+    }
+
+    public PartidaResponse salvarPlacar(Long partidaId, SalvarPlacarRequest request) {
+        Partida partida = partidaRepository.findById(partidaId)
+                .orElseThrow(() -> new RuntimeException("Partida não encontrada!"));
+
+        // Atualiza placar
+        partida.setPlacarCasa(request.getPlacarCasa());
+        partida.setPlacarFora(request.getPlacarFora());
+        partida.setConcluida(true);
+
+        // Define o vencedor
+        if (request.getPlacarCasa() > request.getPlacarFora()) {
+            partida.setVencedorId(partida.getTimeCasa().getId());
+        } else if (request.getPlacarFora() > request.getPlacarCasa()) {
+            partida.setVencedorId(partida.getTimeFora().getId());
+        } else {
+            throw new RuntimeException("Empates não são permitidos nesta fase!");
+        }
+        partidaRepository.save(partida);
+
+        avancarFaseSePossivel(partida.getCopa().getId());
+
+        return PartidaMapper.toResponse(partida);
+    }
+
+    private void simularPlacar(Partida partida, boolean ehJogoDoJogador) {
+        Random random = new Random();
+        int golsCasa, golsFora;
+
+        do {
+            if (ehJogoDoJogador) {
+                golsCasa = random.nextInt(4);
+                golsFora = random.nextInt(4);
+            } else {
+                golsCasa = random.nextInt(5);
+                golsFora = random.nextInt(5);
+            }
+        } while (golsCasa == golsFora);
+
+        partida.setPlacarCasa(golsCasa);
+        partida.setPlacarFora(golsFora);
+        partida.setConcluida(true);
+        partida.setVencedorId(golsCasa > golsFora ? partida.getTimeCasa().getId() : partida.getTimeFora().getId());
+    }
+
+    public void avancarFaseSePossivel(Long copaId) {
+        Copa copa = copaRepository.findById(copaId).orElseThrow();
+
+        // Verifica se a fase atual acabou
+        boolean faseAcabou = copa.getPartidas().stream()
+                .filter(p -> p.getFase() == copa.getFaseAtual() && !p.getConcluida())
+                .findFirst().isEmpty();
+
+        if (faseAcabou) {
+            List<Partida> partidasFaseAtual = copa.getPartidas().stream()
+                    .filter(p -> p.getFase() == copa.getFaseAtual())
+                    .toList();
+
+            List<Time> vencedores = new ArrayList<>();
+            for (Partida p : partidasFaseAtual) {
+                Time vencedor = timeRepository.findById(p.getVencedorId()).orElseThrow();
+                vencedores.add(vencedor);
+            }
+
+            FaseCopa proximaFase = definirProximaFase(copa.getFaseAtual());
+
+            if (proximaFase != null) {
+                // Cria as novas partidas e simula as que não são do jogador
+                for (int i = 0; i < vencedores.size(); i += 2) {
+                    Partida novaPartida = new Partida();
+                    novaPartida.setCopa(copa);
+                    novaPartida.setFase(proximaFase);
+                    novaPartida.setTimeCasa(vencedores.get(i));
+                    novaPartida.setTimeFora(vencedores.get(i + 1));
+                    novaPartida.setConcluida(false);
+
+                    boolean ehJogoDoJogador = novaPartida.getTimeCasa().getId().equals(copa.getTimeDoJogador().getId())
+                            ||
+                            novaPartida.getTimeFora().getId().equals(copa.getTimeDoJogador().getId());
+
+                    if (!ehJogoDoJogador) {
+                        simularPlacar(novaPartida, false);
+                    }
+                    copa.getPartidas().add(novaPartida);
+                }
+                copa.setFaseAtual(proximaFase);
+                copaRepository.save(copa);
+            } else {
+                copa.setStatus(StatusCopa.CAMPEAO);
+                copaRepository.save(copa);
+            }
+        }
+    }
+
+    // Método auxiliar apontando para as próximas fases
+    private FaseCopa definirProximaFase(FaseCopa atual) {
+        return switch (atual) {
+            case OITAVAS -> FaseCopa.QUARTAS;
+            case QUARTAS -> FaseCopa.SEMI;
+            case SEMI -> FaseCopa.FINAL;
+            case FINAL -> null;
+        };
     }
 }
