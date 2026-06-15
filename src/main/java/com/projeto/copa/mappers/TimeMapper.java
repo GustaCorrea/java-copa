@@ -18,8 +18,12 @@ public class TimeMapper {
     // Converte o DTO de Entrada para Entidade do Banco
     public static Time toEntity(TimeRequest request) {
         Time entity = new Time();
-        entity.setNome(request.getNome());
-        entity.setUrlBandeira(request.getUrlBandeira());
+        if (request.getUrlBandeira() == null || request.getUrlBandeira().trim().isEmpty()) {
+            entity.setUrlBandeira(
+                    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png");
+        } else {
+            entity.setUrlBandeira(request.getUrlBandeira());
+        }
         return entity;
     }
 }
