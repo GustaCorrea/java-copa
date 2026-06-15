@@ -120,22 +120,27 @@ public class CopaService {
         Partida partida = partidaRepository.findById(partidaId)
                 .orElseThrow(() -> new RuntimeException("Partida não encontrada!"));
 
-        // Atualiza placar
+        // 1. Atualiza o placar do jogador
         partida.setPlacarCasa(request.getPlacarCasa());
         partida.setPlacarFora(request.getPlacarFora());
         partida.setConcluida(true);
-
-        // Define o vencedor
-        if (request.getPlacarCasa() > request.getPlacarFora()) {
-            partida.setVencedorId(partida.getTimeCasa().getId());
-        } else if (request.getPlacarFora() > request.getPlacarCasa()) {
-            partida.setVencedorId(partida.getTimeFora().getId());
-        } else {
-            throw new RuntimeException("Empates não são permitidos nesta fase!");
-        }
+        partida.setVencedorId(request.getPlacarCasa() > request.getPlacarFora()
+                ? partida.getTimeCasa().getId()
+                : partida.getTimeFora().getId());
         partidaRepository.save(partida);
 
-        avancarFaseSePossivel(partida.getCopa().getId());
+        // Simular todas as outras partidas pendentes da fase atual
+        Copa copa = partida.getCopa();
+        for (Partida p : copa.getPartidas()) {
+            if (p.getFase() == copa.getFaseAtual() && !p.getConcluida()) {
+                // Se não é o jogo do jogador simula
+                simularPlacar(p, false);
+                partidaRepository.save(p);
+            }
+        }
+
+        // Agora que todos foram concluídos, tenta avançar a fase
+        avancarFaseSePossivel(copa.getId());
 
         return PartidaMapper.toResponse(partida);
     }
