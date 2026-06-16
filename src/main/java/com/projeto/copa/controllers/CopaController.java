@@ -7,9 +7,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@CrossOrigin(origins = "*", methods = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+        RequestMethod.DELETE })
 @RestController
 @RequestMapping("/api/copa")
-@CrossOrigin(origins = "*")
 public class CopaController {
 
     private final CopaService copaService;
@@ -36,9 +37,9 @@ public class CopaController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{id}/trocar-time/{timeId}")
-    public ResponseEntity<CopaResponse> trocarTime(@PathVariable Long id, @PathVariable Long timeId) {
-        CopaResponse response = copaService.trocarTime(id, timeId);
+    @PutMapping("/{id}/time/{novoTimeId}")
+    public ResponseEntity<CopaResponse> trocarTime(@PathVariable Long id, @PathVariable Long novoTimeId) {
+        CopaResponse response = copaService.trocarTime(id, novoTimeId);
         return ResponseEntity.ok(response);
     }
 }
